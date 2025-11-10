@@ -5,6 +5,41 @@ import re
 import spacy
 import json
 
+WEBSITE_CONFIGS = {
+    "allrecipes.com": {
+        "ingredient_item": {
+            "tag": "li",
+            "class": "mm-recipes-structured-ingredients__list-item"
+        },
+        "ingredient_fields": {
+            "quantity": {"tag": "span", "attrs": {"data-ingredient-quantity": "true"}},
+            "unit": {"tag": "span", "attrs": {"data-ingredient-unit": "true"}},
+            "name": {"tag": "span", "attrs": {"data-ingredient-name": "true"}}
+        },
+        "instruction_item": {
+            "tag": "p",
+            "class": "comp mntl-sc-block mntl-sc-block-html"
+        }
+    },
+
+    "seriouseats.com": {
+        "ingredient_item": {
+            "tag": "li",
+            "class": "structured-ingredients__list-item"
+        },
+        "ingredient_fields": {
+            "quantity": {"tag": "span", "attrs": {"data-ingredient-quantity": "true"}},
+            "unit": {"tag": "span", "attrs": {"data-ingredient-unit": "true"}},
+            "name": {"tag": "span", "attrs": {"data-ingredient-name": "true"}}
+        },
+        "instruction_item": {
+            "tag": "p",
+            "class": "comp mntl-sc-block mntl-sc-block-html"
+        }
+    },
+}
+
+#load spacy
 nlp = spacy.load("en_core_web_sm")
 
 def clean_ingredient_name(name):
@@ -62,6 +97,21 @@ def clean_ingredient_name(name):
     
     return name.strip()
 
+def get_website_config(url):
+    """
+    Determines which website configuration to use based on the URL.
+    
+    Args:
+        url (str): Recipe URL
+    
+    Returns:
+        dict: Website configuration or None if unsupported
+    """
+    for site_name, config in WEBSITE_CONFIGS.items():
+        if site_name in url:
+            return config
+    return None
+
 def get_raw_ingredients_instructions(url):
     """
     Parses HTML to return the list of ingredients (Ingredient class) and list of instructions (str)
@@ -71,36 +121,62 @@ def get_raw_ingredients_instructions(url):
 
     Returns: (ingredients, instructions)
     """
-    #read url
+    # Get the appropriate configuration for this website
+    config = get_website_config(url)
+    if config is None:
+        raise ValueError(f"Unsupported website. URL: {url}")
+    
+    # Read url
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
 
-    #set empty lists
+    # Set empty lists
     ingredients = []
     instructions = []
 
-    # loop through all ingredient htmls
-    ingredient_items = soup.find_all('li', class_='mm-recipes-structured-ingredients__list-item')
+    # Extract ingredients using config
+    ingredient_config = config["ingredient_item"]
+    ingredient_items = soup.find_all(
+        ingredient_config["tag"], 
+        class_=ingredient_config.get("class")
+    )
+    
     for item in ingredient_items:
-        #extract individual components
-        quantity_span = item.find('span', attrs={'data-ingredient-quantity': 'true'})
-        unit_span = item.find('span', attrs={'data-ingredient-unit': 'true'})
-        name_span = item.find('span', attrs={'data-ingredient-name': 'true'})
+        # Extract individual components using config
+        fields_config = config["ingredient_fields"]
         
-        #get text from each
+        quantity_span = item.find(
+            fields_config["quantity"]["tag"],
+            attrs=fields_config["quantity"]["attrs"]
+        )
+        unit_span = item.find(
+            fields_config["unit"]["tag"],
+            attrs=fields_config["unit"]["attrs"]
+        )
+        name_span = item.find(
+            fields_config["name"]["tag"],
+            attrs=fields_config["name"]["attrs"]
+        )
+        
+        # Get text from each
         quantity = quantity_span.get_text(strip=True) if quantity_span else ""
         unit = unit_span.get_text(strip=True) if unit_span else ""
         name = name_span.get_text(strip=True) if name_span else ""
         
-        #clean the name first
+        # Clean the name first
         name = clean_ingredient_name(name)
 
-        #create Ingredient
+        # Create Ingredient
         ingredient = Ingredient(name=name, quantity=quantity, measurement_unit=unit)
         ingredients.append(ingredient)
 
-    # Loop through all instruction paragraphs (they appear in order in the HTML)
-    instruction_items = soup.find_all('p', class_='comp mntl-sc-block mntl-sc-block-html')
+    # Extract instructions using config
+    instruction_config = config["instruction_item"]
+    instruction_items = soup.find_all(
+        instruction_config["tag"],
+        class_=instruction_config.get("class")
+    )
+    
     for item in instruction_items:
         # Get the text from each instruction paragraph
         instruction_text = item.get_text(strip=True)
@@ -290,7 +366,7 @@ def get_methods_from_instruction(doc):
         
         #prep
         "peel", "core", "pit", "seed", "skin", "trim", "debone",
-        "marinate", "season", "coat", "dredge", "bread", "lay",
+        "marinate", "season", "coat", "dredge", "bread", "bring", "lay", "repeat",
         
         #modifications
         "mash", "puree", "grind", "crush", "grate", "shred", "zest",
@@ -462,7 +538,10 @@ def process_url(url):
     return ingredients, instructions
 
 def main():
-    url = "https://www.allrecipes.com/recipe/218091/classic-and-simple-meat-lasagna/"
+    allrecipes_url = "https://www.allrecipes.com/recipe/218091/classic-and-simple-meat-lasagna/"
+    seriouseats_url = "https://www.seriouseats.com/pecan-pie-cheesecake-recipe-11843450"
+
+    url = allrecipes_url #for testing
     ingredients, instructions = process_url(url)
     
     print("Ingredients:")

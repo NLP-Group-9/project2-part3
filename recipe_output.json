@@ -79,6 +79,7 @@
         "pot"
       ],
       "methods": [
+        "bring",
         "boil"
       ],
       "time": {},
@@ -205,6 +206,7 @@
       "methods": [
         "layer",
         "sprinkle",
+        "repeat",
         "top"
       ],
       "time": {},
