@@ -588,58 +588,6 @@ def main():
         ]
     }
 
-
-    #will remove all this just testing fsm og implementation (down to the stars)
-    print("\n--- interactive recipe navigator ---")
-    print("commands: next | back | jump <num> | move <num> | resume | info | quit")
-
-    while True:
-        step = fsm.get_current_step()
-        print(f"\nstep {step.step_number}: {step.description}")
-
-        command = input("Command: ").strip().lower()
-
-        if command == "next":
-            step = fsm.next_step()
-        elif command == "back":
-            step = fsm.previous_step()
-        elif command.startswith("jump"):
-            parts = command.split()
-            if len(parts) == 2 and parts[1].isdigit():
-                step = fsm.jump_to_step(int(parts[1]))
-            else:
-                print("invalid input")
-                continue
-        elif command.startswith("move"):
-            parts = command.split()
-            if len(parts) == 2:
-                try:
-                    n = int(parts[1])
-                    step = fsm.move_steps_forward(n)
-                except ValueError:
-                    print("invalid input")
-                    continue
-            else:
-                print("invalid input")
-                continue
-        elif command == "resume":
-            step = fsm.resume()
-        elif command == "info":
-            fsm.print_info()
-            continue
-        elif command == "quit":
-            print("exiting recipe navigator.")
-            break
-        else:
-            print("unknown command. try: next, back, jump <num>, move <num>, resume, info, or quit.")
-            continue
-
-        # After each move, print updated step
-        print(f"\nMoved to step {step.step_number}: {step.description}")
-
-    ### will remove up to here at later point             *****************
-
-
     # Write to JSON file
     output_file = "recipe_output.json"
     with open(output_file, 'w', encoding='utf-8') as f:

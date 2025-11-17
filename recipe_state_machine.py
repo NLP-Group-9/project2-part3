@@ -42,8 +42,7 @@ class RecipeStateMachine:
     def print_info(self):
         print(f"current step index: {self.current_step_index}")
         print(f"current step: {self.get_current_step()}")
-        print(f"visited states: {self.visited_states}")
+        #print(f"visited states: {self.visited_states}")
 
 
     
-        
