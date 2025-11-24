@@ -19,6 +19,14 @@ python -m spacy download en_core_web_sm
 1) Run recipe_chat with:
 >python3 recipe_chat.py
 
+## Recipes and Websites Tested On
+1) allrecipes.com like:
+   "https://www.allrecipes.com/recipe/218091/classic-and-simple-meat-lasagna/"
+   "https://www.allrecipes.com/recipe/228285/teriyaki-salmon/"
+
+3) seriouseats.com like:
+   "https://www.seriouseats.com/pecan-pie-cheesecake-recipe-11843450"
+   
 ## Supported User Inputs
 
 Below is a comprehensive list of the types of queries the bot understands. These examples cover everything the bot is designed to do.
