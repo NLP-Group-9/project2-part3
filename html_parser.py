@@ -609,6 +609,39 @@ def get_temperature_from_instruction(doc):
     #no temp
     return ""
 
+def get_type_from_instruction(doc):
+    """
+    Determines if type of instruction is Observation, Advice, or Warning
+
+    Returns
+        str: type of instruction
+    """
+    type = "Observation"  # default
+
+    #get text
+    instruction_text = doc.text.lower()
+
+    #keywords for warning and advice
+    warning_keywords = ['don\'t', 'do not', 'avoid', 'never', 'be careful', 
+                       'careful not to', 'make sure not', 'otherwise']
+    
+    advice_keywords = ['you can', 'optionally', 'optional', 'tip:', 
+                      'for best results', 'try', 'consider', 'if you prefer']
+    
+    #check for warning
+    for keyword in warning_keywords:
+        if keyword in instruction_text:
+            type = "Warning"
+            return type
+    
+    #check for advice
+    for keyword in advice_keywords:
+        if keyword in instruction_text:
+            type = "Advice"
+            return type
+
+    return type
+
 def parse_instructions(instructions, ingredients):
     """
     Parses a list of instruction strings into Step classes
@@ -626,16 +659,18 @@ def parse_instructions(instructions, ingredients):
         methods_extracted = get_methods_from_instruction(doc)
         time_extracted = get_time_from_instruction(doc)
         temp_extracted = get_temperature_from_instruction(doc)
+        type_extracted = get_type_from_instruction(doc)
 
         #create a Step obj
         step = Step(
             step_number=i + 1,
             description=instruction,
-            ingredients=ingredients_extracted,  # Placeholder, can be filled with actual ingredient parsing logic
-            tools=tools_extracted,        # Placeholder
-            methods=methods_extracted,      # Placeholder
-            time=time_extracted,         # Placeholder
-            temperature=temp_extracted   # Placeholder
+            ingredients=ingredients_extracted,  
+            tools=tools_extracted,        
+            methods=methods_extracted,     
+            time=time_extracted,        
+            temperature=temp_extracted,
+            type = type_extracted
         )
         steps.append(step)
 
@@ -686,6 +721,7 @@ def main():
         print(f"  Methods: {step.methods if step.methods else 'None'}")
         print(f"  Time: {step.time.get('duration', 'None') if step.time else 'None'}")
         print(f"  Temperature: {step.temperature if step.temperature else 'None'}")
+        print(f"  Type: {step.type if step.type else 'None'}")
 
     # Convert to JSON-serializable format
     recipe_data = {

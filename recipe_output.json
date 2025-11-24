@@ -27,7 +27,12 @@
       "measurement_unit": "teaspoon"
     },
     {
-      "name": "salt and ground black pepper to taste",
+      "name": "salt",
+      "quantity": "",
+      "measurement_unit": ""
+    },
+    {
+      "name": "ground black pepper",
       "quantity": "",
       "measurement_unit": ""
     },
@@ -87,23 +92,13 @@
     },
     {
       "step_number": 3,
-      "description": "Add lasagna noodles",
+      "description": "Add lasagna noodles and cook for 10 minutes or until al dente; drain.",
       "ingredients": [
         "lasagna noodles"
       ],
       "tools": [],
       "methods": [
-        "add"
-      ],
-      "time": {},
-      "temperature": ""
-    },
-    {
-      "step_number": 4,
-      "description": "cook for 10 minutes or until al dente ; drain .",
-      "ingredients": [],
-      "tools": [],
-      "methods": [
+        "add",
         "cook",
         "drain"
       ],
@@ -113,75 +108,56 @@
       "temperature": ""
     },
     {
-      "step_number": 5,
-      "description": "Meanwhile , place ground beef , garlic , oregano , garlic powder , salt , and black pepper in a large skillet over medium heat ; cook",
+      "step_number": 4,
+      "description": "Meanwhile, place ground beef, garlic, oregano, garlic powder, salt, and black pepper in a large skillet over medium heat; cook and stir until beef is crumbly and evenly browned, about 10 minutes.",
       "ingredients": [
         "beef",
         "garlic",
         "oregano",
-        "garlic powder"
+        "garlic powder",
+        "salt",
+        "ground black pepper"
       ],
       "tools": [
         "skillet"
       ],
       "methods": [
         "cook",
+        "stir",
         "place",
         "heat"
-      ],
-      "time": {},
-      "temperature": "medium heat"
-    },
-    {
-      "step_number": 6,
-      "description": "stir until beef is crumbly and evenly browned , about 10 minutes .",
-      "ingredients": [
-        "beef"
-      ],
-      "tools": [],
-      "methods": [
-        "stir"
       ],
       "time": {
         "duration": "about 10 minutes"
       },
-      "temperature": ""
+      "temperature": "medium heat"
     },
     {
-      "step_number": 7,
-      "description": "Mix cottage cheese , Parmesan cheese",
+      "step_number": 5,
+      "description": "Mix cottage cheese, Parmesan cheese, and eggs together in a large bowl until thoroughly combined.",
       "ingredients": [
         "cottage cheese",
-        "Parmesan cheese"
-      ],
-      "tools": [],
-      "methods": [
-        "mix"
-      ],
-      "time": {},
-      "temperature": ""
-    },
-    {
-      "step_number": 8,
-      "description": "eggs together in a large bowl until thoroughly combined .",
-      "ingredients": [
+        "Parmesan cheese",
         "eggs"
       ],
       "tools": [
         "bowl"
       ],
       "methods": [
+        "mix",
         "combine"
       ],
       "time": {},
       "temperature": ""
     },
     {
-      "step_number": 9,
+      "step_number": 6,
       "description": "Lay 4 noodles side by side on the bottom of a 9x13-inch baking pan; top with a layer of prepared tomato-basil sauce, a layer of ground beef mixture, and a layer of cottage cheese mixture.",
       "ingredients": [
         "beef",
-        "cottage cheese"
+        "cottage cheese",
+        "lasagna noodles",
+        "tomato-basil pasta sauce"
       ],
       "tools": [
         "baking pan",
@@ -197,7 +173,7 @@
       "temperature": ""
     },
     {
-      "step_number": 10,
+      "step_number": 7,
       "description": "Repeat layers twice more, ending with a layer of sauce; sprinkle mozzarella cheese on top.",
       "ingredients": [
         "mozzarella cheese"
@@ -213,7 +189,7 @@
       "temperature": ""
     },
     {
-      "step_number": 11,
+      "step_number": 8,
       "description": "Cover the dish with aluminum foil.",
       "ingredients": [],
       "tools": [
@@ -226,53 +202,36 @@
       "temperature": ""
     },
     {
-      "step_number": 12,
-      "description": "Bake in the preheated oven until the lasagna is bubbling",
-      "ingredients": [],
+      "step_number": 9,
+      "description": "Bake in the preheated oven until the lasagna is bubbling and the cheese has melted, about 30 minutes.",
+      "ingredients": [
+        "lasagna noodles"
+      ],
       "tools": [
         "oven"
       ],
       "methods": [
         "bake"
       ],
-      "time": {},
-      "temperature": ""
-    },
-    {
-      "step_number": 13,
-      "description": "the cheese has melted , about 30 minutes .",
-      "ingredients": [],
-      "tools": [],
-      "methods": [],
       "time": {
         "duration": "about 30 minutes"
       },
       "temperature": ""
     },
     {
-      "step_number": 14,
-      "description": "Remove foil",
+      "step_number": 10,
+      "description": "Remove foil and bake until cheese has begun to brown, about 10 more minutes.",
       "ingredients": [],
       "tools": [],
       "methods": [
-        "remove"
-      ],
-      "time": {},
-      "temperature": ""
-    },
-    {
-      "step_number": 15,
-      "description": "bake until cheese has begun to brown , about 10 more minutes .",
-      "ingredients": [],
-      "tools": [],
-      "methods": [
+        "remove",
         "bake"
       ],
       "time": {},
       "temperature": ""
     },
     {
-      "step_number": 16,
+      "step_number": 11,
       "description": "Allow to stand at least 10 minutes before serving.",
       "ingredients": [],
       "tools": [],
