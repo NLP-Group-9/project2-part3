@@ -19,72 +19,81 @@ python -m spacy download en_core_web_sm
 1) Run recipe_chat with:
 >python3 recipe_chat.py
 
-## User Inputs (examples/available inputs)
-Note: this is not all of the possible ways to ask questions and recieve relevant
-output using our bot, but it is comprehensive and these queries cover everything 
-that our bot is designed to do.
+## Supported User Inputs
 
-**Recipe Retrieval and Display:**
-Requests to show a recipe or its components.
+Below is a comprehensive list of the types of queries the bot understands. These examples cover everything the bot is designed to do.
 
-“Show me the ingredients list.”
-"What are the ingredients?"
-"Ingredints Please"
-“Display the recipe.”
-"Show me the full recipe"
+---
 
-**Navigation Commands**
-Moving between, repeating, or revisiting recipe steps.
+### **1. Recipe Retrieval and Display**
+Use these commands to view the recipe or its components.
 
-"Start the recipe walkthrough"
-"Start cooking"
-"Start"
-“Go back a step.”
-"Go back"
-"Next"
-“Go to the next step.”
-“Repeat please.”
-“Take me to step 3.”
-“What’s next?”
-“What was that again?”
-"Resume recipe walkthrough"
-"Resume"
+- “Show me the ingredients list.”
+- “What are the ingredients?”
+- “Ingredients please.”
+- “Display the recipe.”
+- “Show me the full recipe.”
 
-**Step Parameter Queries**
-Asking about quantities, times, temperatures, or substitutes within the current step.
+---
 
-“How much salt do I need?”
-“What temperature should the oven be?”
-“How long do I bake it?” (Only works if "bake" is included as a step in the recipe),
-otherwise try with relevant verb(s)
-“When is it done?”
-“What can I use instead of butter?”
-"What can I substitute for butter?"
+### **2. Navigation Commands**
+Control the recipe walkthrough step-by-step.
 
-**Clarification Questions**
-Asking for definitions or explanations of terms or tools.
+- “Start the recipe walkthrough.”
+- “Start cooking.”
+- “Start.”
+- “Next.”
+- “Go to the next step.”
+- “Go back.”
+- “Go back a step.”
+- “Repeat please.”
+- “What’s next?”
+- “What was that again?”
+- “Take me to step 3.”
+- “Resume recipe walkthrough.”
+- “Resume.”
 
-“What is a whisk?” or "what's x"
-"How do i sautee?" or "how do i x?"
+---
 
+### **3. Step Parameter Queries**
+Ask about details in the *current* step (timing, quantities, temperatures, substitutions).
 
-**Procedure Questions**
-Asking how to perform an action or technique.
+- “How much salt do I need?”
+- “What temperature should the oven be?”
+- “How long do I bake it?” *(only works if “bake” appears in the recipe steps)*
+- “When is it done?”
+- “What can I substitute for butter?”
+- “What can I use instead of butter?”
 
-“How do I knead the dough?”
-“How do I do that?” — referring to the current step’s action.
-"What is that?" referring to the current step’s action.
-Note: for questions relevant to only one step, make sure to say "start" or start the recipe walkthrough 
-before asking such questions
+---
 
+### **4. Clarification Questions**
+Ask for explanations of tools, terms, or techniques.
 
-**Quantity Questions**
-Asking about ingredient amounts.
+- “What is a whisk?”
+- “What’s X?”
+- “How do I sauté?”
+- “How do I X?”
 
-Specific: “How much flour do I need?”
-Vague (step-dependent): “How much of that do I need?” — referring to an ingredient mentioned in the current step. 
-Again, make sure to start the recipe walkthrough before asking questions of this nature.
+---
 
+### **5. Procedure Questions**
+Ask how to perform an action mentioned in the current step.  
+*(Requires starting the recipe walkthrough first.)*
+
+- “How do I knead the dough?”
+- “How do I do that?”
+- “What is that?” *(referring to the current step’s action)*
+
+---
+
+### **6. Quantity Questions**
+Ask about ingredient amounts.
+
+- **Specific:** “How much flour do I need?”
+- **Step-dependent:** “How much of that do I need?” *(requires the recipe walkthrough to be active)*
+
+---
 
 ## Parsing Logic
 1) Ingredient and Instruction extraction from websites.
