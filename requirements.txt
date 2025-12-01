@@ -3,3 +3,4 @@ beautifulsoup4
 spacy
 flask
 flask-cors
+google-generativeai
