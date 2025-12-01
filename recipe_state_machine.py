@@ -5,13 +5,16 @@ class RecipeStateMachine:
         #visited states tracking
         self.visited_states = []
 
+    def _track_current_step(self):
+        self.visited_states.append((self.current_step_index + 1, self.steps[self.current_step_index]))
+
     def get_current_step(self):
+        self._track_current_step()
         return(self.steps[self.current_step_index])
     
     def jump_to_step(self, step_number):
 
         if ((1 <= step_number) and (step_number <= len(self.steps))):
-            self.visited_states.append(self.current_step_index)
             self.current_step_index = step_number - 1
         else:
             print("step number out of range.")
@@ -43,5 +46,4 @@ class RecipeStateMachine:
         print(f"current step index: {self.current_step_index}")
         print(f"current step: {self.get_current_step()}")
         #print(f"visited states: {self.visited_states}")
-
 

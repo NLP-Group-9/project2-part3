@@ -1,412 +1,14 @@
-"""
-Conversational interface for recipe parsing and querying.
-This is a stateless, rule-based interface that answers questions about recipes.
-"""
-
 import re
 from html_parser import process_url
-from data_classes import Ingredient, Step
+import google.generativeai as genai
+import json
+import os
+from dotenv import load_dotenv
 from recipe_state_machine import RecipeStateMachine
 
-
-def show_ingredients(ingredients):
-    """Display all ingredients in a readable format."""
-    print("\nHere are the ingredients:")
-    for ingredient in ingredients:
-        # Format: quantity + unit + name
-        parts = []
-        if ingredient.quantity:
-            parts.append(ingredient.quantity)
-        if ingredient.measurement_unit:
-            parts.append(ingredient.measurement_unit)
-        if ingredient.name:
-            parts.append(ingredient.name)
-        
-        ingredient_str = " ".join(parts) if parts else ingredient.name
-        print(f"- {ingredient_str}")
-
-
-def show_all_steps(steps):
-    """Display all steps with step numbers."""
-    print("\nHere are all the steps:")
-    for step in steps:
-        print(f"Step {step.step_number}: {step.description}")
-
-
-def show_current_step(fsm):
-    """Display a specific step by number."""
-    step = fsm.get_current_step()
-    print(f"\nStep {step.step_number}: {step.description}")
-    return(None)
-
-
-def is_next_step_query(query):
-    """See if user wants to jump 1 step ahead."""
-
-    patterns = [
-        r'next step',
-        r'next',
-        #only single letter n
-        r'\bn\b',
-        r'advance',
-        r'continue',
-        r'what\'s next',
-        r'forward',
-        r'move ahead',
-        r'proceed',
-        r'forward one step',
-        r'go forward',
-        r'resume',
-    ]
-
-    query = query.lower().strip()
-    for pattern in patterns:
-        if re.search(pattern, query):
-            return(True)
-
-    return(False)
-
-def is_go_back_a_step_query(query):
-    """See if user wants to go back a step."""
-
-    patterns = [
-        r'last step',
-        r'go back a step',
-        #only single letter b
-        r'^b$',
-        r'go back',
-        r'go back one step',
-        r'back',
-        r'previous',
-        r'previous step'
-    ]
-
-    query = query.lower().strip()
-    for pattern in patterns:
-        if re.search(pattern, query):
-            return(True)
-    return(False)
-
-def is_begin_recipe_query(query):
-    """See if user wants to start following the recipe step-by-step."""
-
-    patterns = [
-        r'\bstart recipe\b',
-        r'start cooking',
-        r'begin recipe',
-        r'start the recipe',
-        r'start',
-        r'walkthrough',
-        r'beginning',
-    ]
-
-    query = query.lower().strip()
-    for pattern in patterns:
-        if re.search(pattern, query):
-            return(True)
-    return(False)
-
-def is_repeat_query(query):
-    """Detect if the user wants the current step repeated."""
-    patterns = [
-        r'\brepeat\b',
-        r'\brepeat that\b',
-        r'\brepeat step\b',
-        r'\bsay that again\b',
-        r'\bwhat was that\b',
-        r'\bagain\b$',
-        r'again',
-        r'repeat',
-        r'say again',
-        r'tell me again',
-        r'what did you say',
-    ]
-    
-    q = query.lower().strip()
-    for p in patterns:
-        if re.search(p, q):
-            return True
-    return False
-
-
-
-def extract_ingredient_from_how_much(query):
-    """
-    Extract ingredient name from "how much X do i need?" queries.
-    
-    Args:
-        query: Lowercase user query
-    
-    Returns:
-        str: Extracted ingredient name, or None if not found
-    """
-
-    # Pattern: "how much " followed by ingredient, then optional trailing phrases
-    # Handle: "how much X do i need", "how much X is needed", "how much X do we need"
-    pattern = r'how (?:much|many) (?!time\b)(.+?)(?:\s+(?:do (?:i|we)|is|are)\s+(?:need|needed))?[?.]?$'
-    match = re.search(pattern, query)
-    
-    if match:
-        ingredient = match.group(1).strip()
-        # Remove trailing phrases that might have been captured
-        ingredient = re.sub(r'\s+(?:do (?:i|we)|is|are)\s+(?:need|needed)', '', ingredient)
-        # Remove trailing punctuation
-        ingredient = ingredient.rstrip('?.,!')
-        return ingredient if ingredient else None
-    
-    return None
-
-
-def find_ingredient_by_name(ingredients, search_name):
-    """
-    Find an ingredient by name using case-insensitive substring matching.
-    
-    Args:
-        ingredients: List of Ingredient objects
-        search_name: Name to search for (lowercase)
-    
-    Returns:
-        Ingredient object if found, None otherwise
-    """
-    search_name = search_name.lower().strip()
-    
-    for ingredient in ingredients:
-        ingredient_name_lower = ingredient.name.lower()
-        # Check if search_name is a substring of ingredient name
-        if search_name in ingredient_name_lower or ingredient_name_lower in search_name:
-            return ingredient
-    
-    return None
-
-def handle_substitution_query(query):
-    """Handle ingredient substitution questions."""
-
-    q = query.lower().strip()
-
-    patterns = [
-        r'substitute for (.+)',
-        r'what can i use instead of (.+)',
-        r'what can i substitute for (.+)',
-        r'what can i use instead of (.+)',
-        r'what can i use as a substitute for (.+)',
-        r'in place of (.+)',
-        r'alternative to (.+)',
-        r'replacement for (.+)',
-        r'i dont have (.+)',
-        r'i dont have any(.+)',
-        r'i do not have (.+)',
-        r'i do not have any (.+)',
-        r'im out of (.+)',
-        r'i am out of (.+)',
-        ]
-
-    for p in patterns:
-        match = re.search(p, q)
-        if match:
-            ingredient = match.groups()[-1].strip(" ?.!")
-
-            #if no ingredient found
-            if not ingredient:
-                print("ingredient not found, sorry!")
-                return True
-
-            #link for substitutions
-            encoded = ingredient.replace(" ", "+")
-            url = f"https://www.google.com/search?q={encoded}+cooking+substitute"
-
-            print(f"\nHere are some substitution options for '{ingredient}':")
-            print(url)
-            return(True)
-
-    return(False)
-
-def handle_cooking_time_query(query, steps, time_or_temp_covered):
-    """Handle cooking time or temperature questions."""
-    if time_or_temp_covered:
-        return(False)
-
-    q = query.lower().strip()
-
-    #stole straight from parser for consistency but also I added "cook"
-    actions = ["bake", "roast", "broil", "grill", "toast", "sear",
-        "boil", "simmer", "poach", "steam", "blanch", "parboil", "cook",
-        "fry", "deep-fry", "pan-fry", "saute", "sautee", "stir-fry",
-        "braise", "stew", "microwave", "smoke", "char", "caramelize", "reduce"
-    ]
-    time_mentioned = ("how long" in q) or ("time" in q) or ("minutes" in q) or \
-    ("hours" in q) or ("hour" in q) or ("minute" in q) or ("cook for" in q) or \
-    ("bake for" in q) or ("done" in q) or ("ready" in q)
-
-    if not (time_mentioned):
-        return(False)
-
-    found_action = None
-    for action in actions:
-        if re.search(rf'\b{action}\b', q):
-            found_action = action
-            break
-
-
-    something_found = False
-    
-
-    if found_action:
-        for step in steps:
-            if found_action in step.description.lower():
-                print(f"Step {step.step_number}: {step.description}")
-                something_found = True
-            
-        return(True)
-    
-    #otherwise, no specific action found, list anything with time mentioned
-    for step in steps:
-        if re.search(r'(\d+\s*(minutes|minute|hours|hour))', step.description.lower()) \
-            or re.search(r'\b(how long|time|ready|done)\b', step.description.lower()):
-            print(f"Step {step.step_number}: {step.description}")
-            something_found = True
-    
-    if (something_found == False):
-        print("Couldn't find any relevant cooking time information.")
-        return(False)
-    return(True)
-
-
-def handle_cooking_temp_query(query, steps):
-    """Handle cooking time or temperature questions."""
-    q = query.lower().strip()
-
-    temp_mentioned = ("temp" in q) or ("temperature" in q) or ("heat" in q) or \
-    ("when is it done" in q) or ("degree" in q )
-    temp_keywords = ["degree", "°", "preheat", "oven", "heat to"]
-
-    found_temp_keyword = False
-
-    if (temp_mentioned == False):
-        return(False)
-
-    if temp_mentioned:
-        for step in steps:
-            for keyword in temp_keywords:
-                if keyword in step.description.lower():
-                    found_temp_keyword = True
-                    print(f"Step {step.step_number}: {step.description}")
-                    break
-        if found_temp_keyword:
-            return(True)
-    print("Couldn't find any relevant cooking temperature information.")
-    return(False)
-
-
-def handle_how_much_question(ingredients, query, fsm):
-    """
-    Handle "how much <ingredient> do i need?" questions.
-    
-    Args:
-        ingredients: List of Ingredient objects
-        query: User query (lowercase)
-    
-    Returns:
-        bool: True if handled, False otherwise
-    """
-
-    #how much? or how many? or how much of that? or how many of that? 
-    # or how much of those? or how many of those? (vague)
-    vague_pattern = (
-    r'^(how (much|many))'
-    r'(?:\s+of\s+(that|this|it|those|these))?'
-    r'(?:\s+(do i need|is needed|are needed))?'
-    r'\s*\??$'
-    )
-    
-    if re.search(vague_pattern, query.strip()):
-        step = fsm.get_current_step()
-        if hasattr(step, "ingredients") and step.ingredients:
-            for name in step.ingredients:
-                ingredient = find_ingredient_by_name(ingredients, name)
-                if ingredient:
-                    parts = []
-                    if ingredient.quantity:
-                        parts.append(ingredient.quantity)
-                    if ingredient.measurement_unit:
-                        parts.append(ingredient.measurement_unit)
-                    parts.append(f"of {ingredient.name}")
-                    response = " ".join(parts)
-                else:
-                    response = f"some {name}"
-                print(f"\nYou need {response}.")
-            return(True)
-        print(f"\nI couldn't find any ingredients in this recipe step.")
-        return(True)
-    
-    #otherwise, non-vague
-    # Extract ingredient name
-    ingredient_name = extract_ingredient_from_how_much(query)
-    
-    if not ingredient_name:
-        return False
-    
-    # Find matching ingredient
-    ingredient = find_ingredient_by_name(ingredients, ingredient_name)
-    
-    if ingredient:
-        # Format response
-        parts = []
-        if ingredient.quantity:
-            parts.append(ingredient.quantity)
-        if ingredient.measurement_unit:
-            parts.append(ingredient.measurement_unit)
-        if ingredient.name:
-            parts.append(f"of {ingredient.name}")
-        
-        response = " ".join(parts) if parts else f"some {ingredient.name}"
-        print(f"\nYou need {response}.")
-    else:
-        print(f"\nI couldn't find that ingredient in this recipe.")
-    
-    return True
-
-
-def handle_what_is_question(query, fsm):
-    """
-    Handle "what is X?" questions by returning a Google search URL.
-    
-    Args:
-        query: User query (lowercase)
-    
-    Returns:
-        bool: True if handled, False otherwise
-    """
-    #what's that/what is that?/or even whats that
-    if re.search(r"what(?:'?s| is) that\??$", query):
-        step = fsm.get_current_step()
-        if hasattr(step, "ingredients") and step.ingredients:
-            for ingredient in step.ingredients:
-                name = str(ingredient)
-                search_query = name.replace(" ", "+")
-                url = f"https://www.google.com/search?q={search_query}"
-                print(f"\nI found a reference for you: {url}")
-            return(True)
-                
-
-    #less vague
-    # Pattern: "what is " or "what's" or "whats" followed by the term
-    pattern = r"what(?:'?s| is) (.+?)[?.]?$"
-    match = re.search(pattern, query)
-    
-    if not match:
-        return False
-    
-    search_term = match.group(1).strip()
-    # Remove trailing punctuation
-    search_term = search_term.rstrip('?.,!')
-    
-    # Create Google search URL
-    query_encoded = search_term.replace(" ", "+")
-    url = f"https://www.google.com/search?q={query_encoded}"
-    
-    print(f"\nI found a reference for you: {url}")
-    return True
-
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 def handle_how_do_i_question(query, fsm):
     """
@@ -449,79 +51,87 @@ def handle_how_do_i_question(query, fsm):
     print(f"\nHere's a video search that might help: {url}")
     return True
 
-
-def extract_step_number(query):
+def create_chat_session(recipe_data):
     """
-    Extract step number from queries like "show step 3" or "step 2".
+    Create a new Gemini chat session with recipe context.
     
     Args:
-        query: User query (lowercase)
+        recipe_data: Dict with 'ingredients' and 'instructions' keys
     
     Returns:
-        int: Step number if found, None otherwise
+        chat session object
     """
-    # Pattern: "step" followed by a number
-    pattern = r'step\s+(\d+)'
-    match = re.search(pattern, query)
+    # Configure Gemini API
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel(GEMINI_MODEL)
     
-    if match:
-        return int(match.group(1))
+# Create initial system-like message with recipe context
+    initial_prompt = f"""
+You are a helpful cooking assistant with conversation memory. You can help users navigate through a recipe step-by-step.
+
+FULL RECIPE DATA:
+{json.dumps(recipe_data, indent=2)}
+
+INSTRUCTIONS FOR YOU:
+CRITICAL FIRST STEP: Before anything else, you MUST atomize the instructions. Break down each instruction into smaller, atomic steps. Each atomic step should be a single action. For example:
+- "Preheat oven to 350°F, then mix flour and eggs" → becomes Step 1: "Preheat oven to 350°F" and Step 2: "Mix flour and eggs"
+- Look for conjunctions like "then", "and then", "while", etc. and split on those
+- Each step should be one clear action
+
+After atomizing, you will use ONLY these atomized steps for the entire conversation. Renumber them starting from 1.
+
+Then follow these rules:
+- Track which step the user is currently on based on our conversation
+- If they say "start", "begin", or "start recipe", begin at step 1 of the ATOMIZED steps
+- If they say "next" or "n", move to the next atomized step
+- If they say "back", "b", or "previous", go to the previous atomized step
+- If they say "repeat" or "again", repeat the current atomized step
+- If they ask "step X", jump to that step number in the atomized steps
+- When presenting a step, format it clearly: "Step X: [instruction text]"
+- After showing a step, remind them they can say 'next', 'back', or ask questions
+- If they ask contextual questions like "how much of that?", "what temperature?", "how long?", refer to the current step based on our conversation
+- If asking about ingredients without context, provide exact quantities from the recipe
+- If the answer isn't in the recipe, say so politely and provide general cooking advice if appropriate
+- Keep track of where they are in the recipe throughout our conversation
+
+You should maintain context and remember which step the user is on as we talk.
+
+First, atomize the steps internally, then respond with: "Ready! I've loaded and processed the recipe into [NUMBER] steps. You can ask me questions, or say 'start' to begin the step-by-step walkthrough."
+"""
     
-    return None
-
-
-def is_ingredients_query(query):
-    """Check if query is asking to show ingredients."""
-    patterns = [
-        r'show\s+ingredients',
-        r'list\s+ingredients',
-        r'show\s+me\s+the\s+ingredients',
-        r'ingredients',
-    ]
+    # Start chat session
+    chat = model.start_chat(history=[])
     
-    for pattern in patterns:
-        if re.search(pattern, query):
-            return True
+    # Send initial context
+    response = chat.send_message(initial_prompt)
     
-    return False
+    return chat
 
 
-def is_recipe_query(query):
-    """Check if query is asking to show the full recipe."""
-    patterns = [
-        r'show\s+recipe',
-        r'show\s+all\s+steps',
-        r'display\s+the\s+recipe',
-        r'full\s+recipe',
-        r'show\s+me\s+the\s+recipe',
-        r'display\s+all\s+steps',
-        r'display\s+recipe',
-        r'display\s+the\s+recipe',
-        r'whole recipe',
-        r'entire recipe',
-        r'complete recipe',
-    ]
+def query_gemini_chat(chat, query):
+    """
+    Send a user query through the chat session.
     
-    for pattern in patterns:
-        if re.search(pattern, query):
-            return True
+    Args:
+        chat: Active chat session
+        query: User's current question
     
-    return False
+    Returns:
+        str: Gemini's response
+    """
+    try:
+        response = chat.send_message(query)
+        return response.text
+    except Exception as e:
+        return f"Sorry, I encountered an error: {str(e)}"
 
 
-def is_exit_query(query):
-    """Check if query is asking to exit."""
-    exit_commands = ['quit', 'exit', 'q']
-    return query.strip().lower() in exit_commands
-
-
-def process_user_query(ingredients, steps, fsm, query):
+def process_user_query(chat, query, fsm):
     """
     Process a user query and return appropriate response.
     
     Args:
-        ingredients: List of Ingredient objects
-        steps: List of Step objects
+        chat: Active chat session
         query: User query string
     
     Returns:
@@ -530,90 +140,60 @@ def process_user_query(ingredients, steps, fsm, query):
     query_lower = query.lower().strip()
     
     # Check for exit
-    if is_exit_query(query_lower):
+    if query_lower in ['quit', 'exit', 'q']:
         print("\nGoodbye!")
         return False
     
-    # Check for ingredients list
-    if is_ingredients_query(query_lower):
-        show_ingredients(ingredients)
+    # FSM navigation
+    if query_lower in ['start', 'begin', 'start recipe']:
+        print(f"\nStep 1: {fsm.jump_to_step(1)}")
+        return True
+    elif query_lower in ['next', 'n']:
+        print(f"\n{fsm.next_step()}")
+        return True
+    elif query_lower in ['back', 'b', 'previous']:
+        print(f"\n{fsm.previous_step()}")
+        return True
+    elif query_lower in ['repeat', 'again']:
+        print(f"\n{fsm.get_current_step()}")
+        return True
+    elif re.match(r'step \d+', query_lower):
+        step_num = int(re.findall(r'\d+', query_lower)[0])
+        print(f"\n{fsm.jump_to_step(step_num)}")
+        return True
+
+    # "How do I ..." questions
+    if handle_how_do_i_question(query_lower, fsm):
         return True
     
-    # Check for full recipe
-    if is_recipe_query(query_lower):
-        show_all_steps(steps)
-        return True
-    
-    if is_begin_recipe_query(query_lower):
-        fsm.jump_to_step(1)
-        show_current_step(fsm)
-        print("Type 'next' or 'n' for the next step, or ask a question.")
-        return(True)
-    
-    if is_next_step_query(query_lower):
-        fsm.move_steps_forward(1)
-        show_current_step(fsm)
-        print("Type 'next' or 'n' for the next step, or ask a question.")
-        return(True)
+    # Send to Gemini chat
+    print("\nThinking...")
+    fsm_context = fsm_context_for_prompt(fsm)
+    full_query = f"FSM context:\n{fsm_context}\nUser question: {query}"
+    response = query_gemini_chat(chat, full_query)
 
-    if is_go_back_a_step_query(query_lower):
-        fsm.move_steps_forward(-1)
-        show_current_step(fsm)
-        print("Type 'next' or 'n' for the next step, or ask a question.")
-        return(True)
-    
-    #check for specific step number
-    step_num = extract_step_number(query_lower)
-    if step_num:
-        fsm.jump_to_step(step_num)
-        show_current_step(fsm)
-        return(True)
-    
-    if is_repeat_query(query_lower):
-        show_current_step(fsm)
-        return(True)
-    
-    # Check for "how much" questions
-    if (query_lower.startswith("how much")) or (query_lower.startswith("how many")):
-        if handle_how_much_question(ingredients, query_lower, fsm):
-            return True
-    
-    # Check for "what is" questions
-    if (query_lower.startswith("what is")) or (query_lower.startswith("what's"))\
-        or (query_lower.startswith("whats")):
-        if handle_what_is_question(query_lower, fsm):
-            return True
-    
-    # Check for "how" questions (that are not "how much")
-    if query_lower.startswith("how"):
-        if handle_how_do_i_question(query_lower, fsm):
-            return True
-        
-    
-    time_or_temp_covered = False
+    #full prompt chat gets (4 debugging)
+    #print(full_query)
 
-    if handle_cooking_temp_query(query, steps):
-        #time and temp have overlap and return same info a lot of times
-        time_or_temp_covered = True
-        return(True)
+    print(f"\n{response}")
     
-    if handle_cooking_time_query(query, steps, time_or_temp_covered):
-        return(True)
+    return(True)
+
+def fsm_context_for_prompt(fsm):
+    """
+    create a string summarizing the FSM state for inclusion in the AI prompt.
+    """
+    current_step_number, current_step_text = fsm.visited_states[-1] if fsm.visited_states else (fsm.current_step_index + 1, fsm.steps[fsm.current_step_index])
     
-    if handle_substitution_query(query_lower):
-        return(True)
-
-    # Fallback: help message
-    print("\nSorry, I didn't understand that.")
-    print("\nI can:")
-    print("- show ingredients")
-    print("- show the full recipe")
-    print("- start recipe walkthrough (start)")
-    print("- show step <number>")
-    print("- answer \"how much <ingredient> do I need?\"")
-    print("- answer \"what is X?\" and \"how do I X?\" with helpful links.")
-
-    return True
+    context = f"Current step: Step {current_step_number}: {current_step_text}\n"
+    
+    if fsm.visited_states:
+        visited_formatted = [f"Step {num}: {text}" for num, text in fsm.visited_states]
+        context += f"Previously visited steps ({len(visited_formatted)}): {visited_formatted}\n"
+    else:
+        context += "No previously visited steps.\n"
+    
+    return context
 
 
 def main():
@@ -631,17 +211,23 @@ def main():
     # Parse the recipe
     print("\nParsing recipe...")
     try:
-        ingredients, steps = process_url(url)
-        print(f"Successfully parsed recipe with {len(ingredients)} ingredients and {len(steps)} steps!")
+        recipe_data = process_url(url) #for ai
+        steps = recipe_data["instructions"] # for fsm
+        print(f"Successfully parsed recipe with {len(recipe_data['ingredients'])} ingredients and {len(recipe_data['instructions'])} steps!")
     except Exception as e:
         print(f"Error parsing recipe: {e}")
         return
     
+    # Create chat session with recipe context
+    print("\nInitializing AI assistant...")
+    chat = create_chat_session(recipe_data)
+
     fsm = RecipeStateMachine(steps)
     
     # Enter conversation loop
     print("\n" + "=" * 50)
     print("You can now ask questions about the recipe.")
+    print("Try: 'start' to begin walkthrough, 'next', 'back', 'repeat', or ask any question!")
     print("Type 'quit', 'exit', or 'q' to exit.")
     print("=" * 50)
     
@@ -651,7 +237,7 @@ def main():
         if not query:
             continue
         
-        should_continue = process_user_query(ingredients, steps, fsm, query)
+        should_continue = process_user_query(chat, query, fsm)
         
         if not should_continue:
             break
@@ -659,4 +245,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
