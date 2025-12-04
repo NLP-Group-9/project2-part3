@@ -16,10 +16,11 @@ class RecipeStateMachine:
 
         if ((1 <= step_number) and (step_number <= len(self.steps))):
             self.current_step_index = step_number - 1
+            self._track_current_step()
         else:
             print("step number out of range.")
 
-        return(self.get_current_step())
+        return(self.steps[self.current_step_index])
 
     def move_steps_forward(self, steps_forward):
     #xsteps_forward == -1 -> back 1 step
@@ -33,13 +34,6 @@ class RecipeStateMachine:
 
     def previous_step(self):
         return(self.move_steps_forward(-1))
-    
-    #if there was a jump (ex. what temp to set oven to form 5 steps ago)
-    #and the user wants to go back to the bit of the recipe they were on
-    def resume(self):
-        if self.visited_states:
-            self.current_step_index = self.visited_states[-1]
-        return(self.get_current_step())
 
     #for debugging
     def print_info(self):

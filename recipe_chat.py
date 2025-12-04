@@ -81,20 +81,31 @@ CRITICAL FIRST STEP: Before anything else, you MUST atomize the instructions. Br
 After atomizing, you will use ONLY these atomized steps for the entire conversation. Renumber them starting from 1.
 
 Then follow these rules:
-- Track which step the user is currently on based on our conversation
-- If they say "start", "begin", or "start recipe", begin at step 1 of the ATOMIZED steps
-- If they say "next" or "n", move to the next atomized step
-- If they say "back", "b", or "previous", go to the previous atomized step
-- If they say "repeat" or "again", repeat the current atomized step
-- If they ask "step X", jump to that step number in the atomized steps
-- When presenting a step, format it clearly: "Step X: [instruction text]"
-- After showing a step, remind them they can say 'next', 'back', or ask questions
-- If they ask contextual questions like "how much of that?", "what temperature?", "how long?", refer to the current step based on our conversation
+- Remember which step the user is currently on based on our conversation
+
+IMPORTANT NOTE ABOUT STEPS:
+- A 
+finite state machine (FSM) controls which step the user is on.
+- you DO NOT track the user's step.
+- you DO NOT move forward or backward.
+- you DO NOT interpret commands like “next,” “back,” “start,” or “step 3.”
+- The FSM will provide you the current step as:
+    “Current step: Step X: <text>”
+- ALWAYS use the step provided in the FSM context.
+- the FSM will also provide any history of steps visited. If the user asks about 
+step visiting history, please spit that history back VERBATIM.
+
+- If they ask contextual questions like "how much of that?", "what temperature?", "how long?", refer to the current step based on the FSM
 - If asking about ingredients without context, provide exact quantities from the recipe
 - If the answer isn't in the recipe, say so politely and provide general cooking advice if appropriate
-- Keep track of where they are in the recipe throughout our conversation
 
-You should maintain context and remember which step the user is on as we talk.
+You should maintain context and remember which step the user is on as we talk, keeping in mind the FSM state and history
+you MUST NOT:
+- Track or store the current step.
+- Assume the next or previous step.
+- Navigate the recipe.
+- Reply with “moving to step…” or similar.
+- Renumber or regenerate steps after your initial atomization. 
 
 First, atomize the steps internally, then respond with: "Ready! I've loaded and processed the recipe into [NUMBER] steps. You can ask me questions, or say 'start' to begin the step-by-step walkthrough."
 """
@@ -145,20 +156,20 @@ def process_user_query(chat, query, fsm):
         return False
     
     # FSM navigation
-    if query_lower in ['start', 'begin', 'start recipe']:
+    if re.search(r'\bstart\b', query_lower):
         print(f"\nStep 1: {fsm.jump_to_step(1)}")
         return True
-    elif query_lower in ['next', 'n']:
+    elif re.search(r'\b(next)\b', query_lower):
         print(f"\n{fsm.next_step()}")
         return True
-    elif query_lower in ['back', 'b', 'previous']:
+    elif re.search(r'\b(back|previous)\b', query_lower):
         print(f"\n{fsm.previous_step()}")
         return True
-    elif query_lower in ['repeat', 'again']:
+    elif re.search(r'\b(repeat|again)\b', query_lower):
         print(f"\n{fsm.get_current_step()}")
         return True
-    elif re.match(r'step \d+', query_lower):
-        step_num = int(re.findall(r'\d+', query_lower)[0])
+    elif re.search(r'step (\d+)', query_lower):
+        step_num = int(re.search(r'step (\d+)', query_lower).group(1))
         print(f"\n{fsm.jump_to_step(step_num)}")
         return True
 
@@ -170,7 +181,9 @@ def process_user_query(chat, query, fsm):
     print("\nThinking...")
     fsm_context = fsm_context_for_prompt(fsm)
     full_query = f"FSM context:\n{fsm_context}\nUser question: {query}"
+    print(f"FSM context:{fsm_context}")
     response = query_gemini_chat(chat, full_query)
+
 
     #full prompt chat gets (4 debugging)
     #print(full_query)
@@ -181,9 +194,11 @@ def process_user_query(chat, query, fsm):
 
 def fsm_context_for_prompt(fsm):
     """
-    create a string summarizing the FSM state for inclusion in the AI prompt.
+    Create a string summarizing the FSM state for inclusion in the AI prompt.
     """
-    current_step_number, current_step_text = fsm.visited_states[-1] if fsm.visited_states else (fsm.current_step_index + 1, fsm.steps[fsm.current_step_index])
+    # Always take current step from FSM index
+    current_step_number = fsm.current_step_index + 1
+    current_step_text = fsm.steps[fsm.current_step_index]
     
     context = f"Current step: Step {current_step_number}: {current_step_text}\n"
     
