@@ -5,6 +5,8 @@ import google.generativeai as genai
 import json
 import os
 from dotenv import load_dotenv
+import re
+from recipe_state_machine import RecipeStateMachine
 
 load_dotenv()
 
@@ -14,6 +16,33 @@ CORS(app)  # Enable CORS for frontend
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = "gemini-2.5-flash-lite"
 
+def handle_how_do_i_question(query, fsm):
+    """Handle "how do I X?" questions by returning a YouTube search URL."""
+    if re.search(r'^(how\??|how do i do (that|this|it)\??)$', query.strip()):
+        step = fsm.get_current_step()
+        if hasattr(step, "methods") and step.methods:
+            urls = []
+            for method in step.methods:
+                search_query = f"how to {method}".replace(" ", "+")
+                url = f"https://www.youtube.com/results?search_query={search_query}"
+                urls.append(f"Here's a video search that might help: {url}")
+            return "\n".join(urls)
+        return "I couldn't find any methods in this recipe step."
+    
+    pattern = r'how do (?:i|you) (.+?)[?.]?$'
+    match = re.search(pattern, query)
+    
+    if not match:
+        return None
+    
+    action = match.group(1).strip()
+    action = action.rstrip('?.,!')
+    
+    search_query = f"how to {action}".replace(" ", "+")
+    url = f"https://www.youtube.com/results?search_query={search_query}"
+    
+    return f"Here's a video search that might help: {url}"
+
 # Global state to store parsed recipe data
 recipe_data = {
     'recipe': None,
@@ -22,6 +51,8 @@ recipe_data = {
 
 # Store chat sessions per session (simplified - in production use proper sessions)
 chat_sessions = {}
+#fsms too
+fsms = {}
 
 
 def create_chat_session(recipe_data):
@@ -91,6 +122,23 @@ First, atomize the steps internally, then respond with: "Ready! I've loaded and 
     
     return chat
 
+def fsm_context_for_prompt(fsm):
+    """
+    Create a string summarizing the FSM state for inclusion in the AI prompt.
+    """
+    # Always take current step from FSM index
+    current_step_number = fsm.current_step_index + 1
+    current_step_text = fsm.steps[fsm.current_step_index]
+    
+    context = f"Current step: Step {current_step_number}: {current_step_text}\n"
+    
+    if fsm.visited_states:
+        visited_formatted = [f"Step {num}: {text}" for num, text in fsm.visited_states]
+        context += f"Previously visited steps ({len(visited_formatted)}): {visited_formatted}\n"
+    else:
+        context += "No previously visited steps.\n"
+    
+    return context
 
 @app.route('/api/parse', methods=['POST'])
 def parse_recipe():
@@ -132,7 +180,7 @@ def parse_recipe():
 @app.route('/api/query', methods=['POST'])
 def query_recipe():
     """Process a query about the recipe."""
-    global recipe_data, chat_sessions
+    global recipe_data, chat_sessions, fsms
     
     if not recipe_data['recipe']:
         return jsonify({'error': 'No recipe loaded. Please parse a recipe first.'}), 400
@@ -149,14 +197,42 @@ def query_recipe():
     
     if not query:
         return jsonify({'error': 'No query provided'}), 400
-    
+    # Get or create fsm session for this session
+    if session_id not in fsms:
+            fsms[session_id] = RecipeStateMachine(recipe_data['recipe']['instructions'])
     # Get or create chat session for this session
     if session_id not in chat_sessions:
         chat_sessions[session_id] = create_chat_session(recipe_data['recipe'])
     
     try:
+        fsm = fsms[session_id]
         chat = chat_sessions[session_id]
-        response = chat.send_message(query)
+
+        #update fsm w regex specific to step changes
+        query_lower = query.lower().strip()
+        if re.search(r'\bstart\b', query_lower):
+            fsm.jump_to_step(1)
+        elif re.search(r'\b(next)\b', query_lower):
+            fsm.next_step()
+        elif re.search(r'\b(back|previous)\b', query_lower):
+            fsm.previous_step()
+        elif re.search(r'\b(repeat|again)\b', query_lower):
+            fsm.get_current_step()
+        elif re.search(r'step (\d+)', query_lower):
+            step_num = int(re.search(r'step (\d+)', query_lower).group(1))
+            fsm.jump_to_step(step_num)
+
+        #how do i
+        youtube_response = handle_how_do_i_question(query, fsm)
+        if youtube_response:
+            return jsonify({'success': True, 'response': youtube_response})
+
+
+        #reference fsm changes
+        fsm_context = fsm_context_for_prompt(fsm)
+        full_query = f"FSM context:\n{fsm_context}\nUser question: {query}"
+
+        response = chat.send_message(full_query)
         
         return jsonify({
             'success': True,

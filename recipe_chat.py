@@ -181,7 +181,7 @@ def process_user_query(chat, query, fsm):
     print("\nThinking...")
     fsm_context = fsm_context_for_prompt(fsm)
     full_query = f"FSM context:\n{fsm_context}\nUser question: {query}"
-    print(f"FSM context:{fsm_context}")
+    #print(f"FSM context:{fsm_context}")
     response = query_gemini_chat(chat, full_query)
 
 
