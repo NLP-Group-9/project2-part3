@@ -6,6 +6,9 @@ import spacy
 import json
 from recipe_state_machine import RecipeStateMachine
 
+#load spacy
+nlp = spacy.load("en_core_web_sm")
+
 WEBSITE_CONFIGS = {
     "allrecipes.com": {
         "ingredient_item": {
@@ -228,6 +231,80 @@ def get_raw_ingredients_instructions(url):
     return ingredients, instructions
 
 
+def atomize_steps(instructions):
+    """
+    Takes a list of instruction strings and breaks them into smaller atomic steps.
+    Uses spaCy for natural language processing.
+
+    Args:
+        instructions (list of str): List of instruction strings
+    Returns:
+        list of str: List of atomic instruction strings
+    """
+    import spacy
+    
+    #conjunctions that separate two steps
+    conjunctions = ['then']
+    
+    #store final results
+    atomic_steps = []
+    
+    # Process each instruction paragraph
+    for instruction in instructions:
+        #label each entity with spacy
+        doc = nlp(instruction)
+        
+        #split into sentences
+        sentences = list(doc.sents)
+        
+        #for each sentence
+        for sentence in sentences:
+            # Find all verbs in this sentence
+            verbs = [token for token in sentence if token.pos_ == "VERB"]
+            
+            # If there's only one verb or no verbs, keep the sentence as is
+            if len(verbs) <= 1:
+                atomic_steps.append(sentence.text.strip())
+                continue
+            
+            #Multiple verbs - check if they're coordinated from conjunction list
+            split_occurred = False
+            
+            #Look for conjunctions between verbs
+            for token in sentence:
+                # Check if conjunction
+                if token.text.lower() in conjunctions:
+                    # Check if there are verbs on both sides of this coordinator
+                    verbs_before = [t for t in sentence if t.pos_ == "VERB" and t.i < token.i]
+                    verbs_after = [t for t in sentence if t.pos_ == "VERB" and t.i > token.i]
+                    
+                    #split logic
+                    if verbs_before and verbs_after:             
+                        # Get the text before the coordinator
+                        left_tokens = [t for t in sentence if t.i < token.i]
+                        left_text = " ".join([t.text for t in left_tokens]).strip()
+                        
+                        # Get the text after the coordinator
+                        right_tokens = [t for t in sentence if t.i > token.i]
+                        right_text = " ".join([t.text for t in right_tokens]).strip()
+                        
+                        # Clean up punctuation at the end of left_text
+                        if left_text.endswith(',') or left_text.endswith(';'):
+                            left_text = left_text[:-1].strip()
+                        
+                        # Add both parts as atomic steps
+                        atomic_steps.append(left_text)
+                        atomic_steps.append(right_text)
+                        
+                        split_occurred = True
+                        break  # Only split once per sentence
+            
+            # If no split occurred, keep the original sentence
+            if not split_occurred:
+                atomic_steps.append(sentence.text.strip())
+    
+    return atomic_steps
+
 #FOR PROJECT 2 PART 2 ONLY, returns raw original strings for ingredients and instructions
 def process_url(url):
     """
@@ -240,7 +317,7 @@ def process_url(url):
     ingredients, instructions = get_raw_ingredients_instructions(url)
 
     # #Atomize instructions into smaller atomic steps
-    # instructions = atomize_steps(instructions)
+    instructions = atomize_steps(instructions)
 
     # #parse instructions into Step classes
     # instructions = parse_instructions(instructions, ingredients)
@@ -258,9 +335,10 @@ def main():
     url4 = "https://www.foodnetwork.com/recipes/pumpkin-pie-in-a-sheet-pan-3415884"
 
     url = url1 #to test other
-    ingredients, instructions = process_url(url)
+    results = process_url(url)
 
-    fsm = RecipeStateMachine(instructions)
+    ingredients = results["ingredients"]
+    instructions = results["instructions"]
     
     print("Ingredients:")
     for ingredient in ingredients:
