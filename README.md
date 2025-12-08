@@ -33,6 +33,8 @@ Then open your browser to `http://localhost:5000`
 python recipe_chat.py
 ```
 
+## Youtube demo
+https://youtu.be/MMIwPyxmFjI
 
 ## Usage
 
